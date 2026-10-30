@@ -1,0 +1,86 @@
+# pw-failover.conf — settings for pw-failover.sh. Install as /root/scripts/pw-failover.conf
+# (or point $PWF_CONF at it). Sourced by the script and re-read every loop, so edits apply without a
+# restart. Shell syntax: no spaces around `=`.
+#
+# To edit them in LuCI instead (Network ▸ Failover ▸ Settings), run `pw-failover.sh conf-to-uci`
+# once: it copies this file into /etc/config/pw-failover, and from then on the script reads only
+# that and ignores this file.
+
+# observe: run every probe and URL test, log and report what it WOULD do, change nothing.
+# act:     switch routes and nodes and restart passwall2 for real.
+# Start in observe, read the log and `test-nodes`, then switch to act.
+MODE=observe
+
+# --- nodes -----------------------------------------------------------------------------------
+# passwall2 node ids (the uci section names: `uci show passwall2 | grep =nodes`).
+# The chain is PRIMARY_NODE, then tier 1, then tier 2, each in uci (= LuCI tab) order and read
+# fresh on every incident, so new nodes in a group join automatically, then the TIER3_NODES in the
+# order listed. The first node whose URL test passes wins. Leave a group empty to skip that tier.
+PRIMARY_NODE=                   # required: the node you normally run, e.g. aBcD1234
+TIER1_GROUP=GroupA              # node group (LuCI tab) tried first…
+TIER1_PORT=443                  # …only its nodes on these ports, e.g. 443,2083 (empty = any port)
+TIER2_GROUP=GroupB              # then this group
+TIER2_PORT=
+TIER3_NODES=""                  # last resort: these node ids, in this order, e.g. "aBcD1234 eFgH5678"
+# Never selected, whatever the filters say. Pseudo-nodes (_shunt, _balancing…) are always refused;
+# add node ids and server addresses you never want used directly. A node behind a pre-proxy
+# (passwall2's chain_proxy) is matched on the pre-proxy's address, the one the router actually dials.
+DENY_NODES=""
+DENY_ADDRS=""
+
+# --- WANs ------------------------------------------------------------------------------------
+# netifd interface names. The first is the primary; the others are backups, used through a
+# metric-0 default route. Each incident tries the primary, then the backups that are already up,
+# then the backups that are down: those are raised with ifup as a last resort, whatever their
+# `auto` setting, and lowered again afterwards. List order breaks ties within each group, so a
+# spare modem listed first is used first when it is already up, and raised last when it is not.
+WAN_ORDER="wan wan2"
+# A WAN is up when any target answers a ping bound to its device. Use a site on passwall2's DIRECT
+# list, so it answers whenever the local internet works even with the tunnel dead. host=seed: the
+# host is resolved hourly while healthy and cached; the seed IP is used until the first lookup.
+WAN_TARGETS="direct-site.example=203.0.113.10 8.8.8.8"
+WAN_UP_WAIT=20                  # seconds to wait for an auto-0 interface to get a lease
+# Optional direct-internet check, run bound to each WAN's device before the ping: an IP-echo URL
+# (it must answer with just your IP) whose address passwall2 routes DIRECT, e.g. one covered by a
+# geoip rule in your Direct shunt, so the router's own request skips the tunnel. Then the reply is
+# that line's public IP, shown on the status page. Empty = ping only.
+DIRECT_CHECK_URL=""
+
+# --- probe and reports -----------------------------------------------------------------------
+# Your tunnel's exit address(es), space-separated. A probe passes only when Cloudflare's trace or
+# ifconfig.co, fetched through the tunnel, reports one of them; any other address means traffic is
+# leaving outside the tunnel, and counts as a failure. Recommended when all your nodes share an exit.
+EXPECT_EXIT_IPS=""
+# Used only when EXPECT_EXIT_IPS is empty: two-letter country code (as Cloudflare's /cdn-cgi/trace
+# prints it) of your DIRECT exit. A probe that comes back from there counts as a failure. Empty = off.
+PROBE_BAD_LOC=
+# Lock files or directories other tools hold while they restart passwall2; the watchdog waits
+# while any exists and never takes them.
+EXTRA_LOCKS=""
+REPORT_NAME=                    # Telegram title tag; empty = the router's hostname
+
+# --- detection -------------------------------------------------------------------------------
+PROBE_INTERVAL=20               # seconds between live-tunnel probes while healthy
+FAIL_INTERVAL=5                 # seconds between probes once one has failed (each takes ~11 s)
+FAIL_THRESHOLD=3                # consecutive failed probes before an incident (~45 s)
+GRACE=300                       # quiet seconds after the daemon starts (modem resync after boot)
+XRAY_MIN_AGE=90                 # skip probes while xray is younger than this (someone restarted it)
+
+# --- switch-back -----------------------------------------------------------------------------
+NODE_SB_INTERVAL=300            # URL-test the primary node this often while on a fallback node
+NODE_SB_PASSES=6                # consecutive passes before switching back (6 x 5 min = 30 min)
+WAN_SB_CHECK=60                 # direct-check the primary WAN this often while on a backup WAN
+WAN_STAT_INTERVAL=0             # direct-check every WAN this often while healthy, for the status
+                                # page; 0 = only during failover, switch-back and `retest`
+WAN_SB_HOLD_DOWN=300            # primary WAN pinging this long -> switch back (it had been down)
+WAN_SB_HOLD_NODES=1800          # same, when it was left because every node failed over it
+SB_MAX_WAIT=21600               # a failed switch-back doubles the wait, capped here (6 h)
+
+# --- limits ----------------------------------------------------------------------------------
+MAX_RESTARTS=6                  # passwall2 restarts per incident
+MAX_INCIDENTS_HOUR=3            # then cool down for INCIDENT_COOLDOWN
+INCIDENT_COOLDOWN=1800
+BACKOFF="300 600 1200 1800"     # wait between incidents that fixed nothing (last value repeats)
+# Restart passwall2 after every WAN route change, both ways. xray's open sockets keep the old
+# source address and otherwise stall for minutes; the restart is a 5-15 s blip instead.
+RESTART_ON_WAN_CHANGE=1

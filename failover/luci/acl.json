@@ -1,0 +1,25 @@
+{
+	"luci-app-pw-failover": {
+		"description": "Grant access to the pw-failover status and settings pages",
+		"read": {
+			"file": {
+				"/root/scripts/pw-failover.sh json": [ "exec" ],
+				"/root/scripts/pw-failover.sh defaults": [ "exec" ]
+			},
+			"uci": [ "pw-failover", "passwall2", "network", "system" ]
+		},
+		"write": {
+			"file": {
+				"/root/scripts/pw-failover.sh retest": [ "exec" ],
+				"/root/scripts/pw-failover.sh test-nodes-bg": [ "exec" ],
+				"/root/scripts/pw-failover.sh revert-bg": [ "exec" ],
+				"/root/scripts/pw-failover.sh pause *": [ "exec" ],
+				"/root/scripts/pw-failover.sh resume": [ "exec" ],
+				"/root/scripts/pw-failover.sh test-telegram": [ "exec" ],
+				"/root/scripts/pw-failover.sh manual-bg *": [ "exec" ],
+				"/root/scripts/pw-failover.sh manual-clear-bg": [ "exec" ]
+			},
+			"uci": [ "pw-failover" ]
+		}
+	}
+}

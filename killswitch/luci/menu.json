@@ -1,0 +1,13 @@
+{
+	"admin/network/killswitch": {
+		"title": "Killswitch",
+		"order": 66,
+		"action": {
+			"type": "view",
+			"path": "pw-killswitch/killswitch"
+		},
+		"depends": {
+			"acl": [ "luci-app-pw-killswitch" ]
+		}
+	}
+}

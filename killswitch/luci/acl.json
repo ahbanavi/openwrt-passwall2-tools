@@ -1,0 +1,22 @@
+{
+	"luci-app-pw-killswitch": {
+		"description": "Grant access to the pw-killswitch page",
+		"read": {
+			"file": {
+				"/root/scripts/pw-killswitch.sh json": [ "exec" ]
+			},
+			"ubus": {
+				"luci-rpc": [ "getHostHints" ]
+			},
+			"uci": [ "pw-killswitch" ]
+		},
+		"write": {
+			"file": {
+				"/root/scripts/pw-killswitch.sh test *": [ "exec" ],
+				"/root/scripts/pw-killswitch.sh test-stop": [ "exec" ],
+				"/root/scripts/pw-killswitch.sh compile-bg": [ "exec" ]
+			},
+			"uci": [ "pw-killswitch" ]
+		}
+	}
+}
